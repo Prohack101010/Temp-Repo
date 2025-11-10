@@ -25,9 +25,6 @@ import js.Browser;
 import sys.io.Process;
 #end
 
-/**
-	Access operating system level settings and operations.
-**/
 #if !lime_debug
 @:fileXml('tags="haxe,release"')
 @:noDebug
@@ -35,9 +32,9 @@ import sys.io.Process;
 @:access(lime._internal.backend.native.NativeCFFI)
 @:access(lime.system.Display)
 @:access(lime.system.DisplayMode)
-#if (cpp && windows && !lime_disable_gpu_hint)
+#if (cpp && windows && !HXCPP_MINGW && !lime_disable_gpu_hint)
 @:cppFileCode('
-#if defined(HX_WINDOWS) && !defined(__MINGW32__)
+#if defined(HX_WINDOWS)
 extern "C" {
 	_declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
 	_declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
@@ -47,68 +44,21 @@ extern "C" {
 #end
 class System
 {
-	/**
-		Determines if the screen saver is allowed to start or not.
-	**/
 	public static var allowScreenTimeout(get, set):Bool;
-
-	/**
-		The path to the directory where the application is installed, along with
-		its supporting files. In many cases, this directory is read-only, and
-		attempts to write to files, create new files, or delete files in this
-		directory are likely fail.
-	**/
 	public static var applicationDirectory(get, never):String;
-
-	/**
-		The application's dedicated storage directory, which unique to each
-		application and user. Useful for storing settings on a user-specific
-		and application-specific basis.
-
-		This directory may or may not be removed when the application is
-		uninstalled, and it depends on the platform and installer technology
-		that is used.
-	**/
 	public static var applicationStorageDirectory(get, never):String;
-
-	/**
-		The path to the directory containing the user's desktop.
-	**/
 	public static var desktopDirectory(get, never):String;
-
 	public static var deviceModel(get, never):String;
 	public static var deviceVendor(get, never):String;
 	public static var disableCFFI:Bool;
-
-	/**
-		The path to the directory containing the user's documents.
-	**/
 	public static var documentsDirectory(get, never):String;
-
-	/**
-		The platform's default endianness for bytes.
-	**/
 	public static var endianness(get, never):Endian;
-
-	/**
-		The path to the directory where fonts are installed.
-	**/
 	public static var fontsDirectory(get, never):String;
-
-	/**
-		The number of available video displays.
-	**/
 	public static var numDisplays(get, never):Int;
-
 	public static var platformLabel(get, never):String;
 	public static var platformName(get, never):String;
 	public static var platformVersion(get, never):String;
-
-	/**
-		The path to the user's home directory.
-	**/
 	public static var userDirectory(get, never):String;
-
 	@:noCompletion private static var __applicationDirectory:String;
 	@:noCompletion private static var __applicationEntryPoint:Map<String, Function>;
 	@:noCompletion private static var __applicationStorageDirectory:String;
@@ -189,21 +139,6 @@ class System
 	#end
 
 	#if (!lime_doc_gen || sys)
-	/**
-		Attempts to exit the application. Dispatches `onExit`, and will not
-		exit if the event is canceled. When exiting using this method, Lime will
-		gracefully shut down a number of subsystems, including (but not limited
-		to) audio, graphics, timers, and game controllers.
-
-		To properly exit a Lime application, it's best to call Lime's
-		`System.exit()` instead of calling Haxe's built-in `Sys.exit()`. When
-		targeting native platforms especially, Lime's is built on C++ libraries
-		that expose functions to clean up resources properly on exit. Haxe's
-		`Sys.exit()` exits immediately without giving Lime a chance to clean
-		things up. With that in mind, the proper and correct way to exit a Lime
-		app is by calling `lime.system.System.exit()`, and to avoid using
-		`Sys.exit()`.
-	**/
 	public static function exit(code:Int):Void
 	{
 		var currentApp = Application.current;
@@ -220,11 +155,6 @@ class System
 		#end
 
 		#if sys
-		try {
-			@:privateAccess
-			currentApp.__backend.exit();
-		}
-		catch (e:Dynamic) {}
 		Sys.exit(code);
 		#elseif (js && html5)
 		if (currentApp != null && currentApp.window != null)
@@ -237,21 +167,6 @@ class System
 	}
 	#end
 
-	/**
-		Returns the display orientation with the specified ID.
-	**/
-	public static function getDisplayOrientation(id:Int):DisplayOrientation
-	{
-		#if (lime_cffi && !macro)
-		return NativeCFFI.lime_system_get_display_orientation(id);
-		#else
-		return DISPLAY_ORIENTATION_UNKNOWN;
-		#end
-	}
-
-	/**
-		Returns information about the video display with the specified ID.
-	**/
 	public static function getDisplay(id:Int):Display
 	{
 		#if (lime_cffi && !macro)
@@ -261,25 +176,12 @@ class System
 		{
 			var display = new Display();
 			display.id = id;
-			display.name = CFFI.stringValue(displayInfo.name);
-			display.bounds = new Rectangle(displayInfo.bounds.x, displayInfo.bounds.y, displayInfo.bounds.width, displayInfo.bounds.height);
-			display.orientation = displayInfo.orientation;
-
-			#if android
-			var getDisplaySafeArea = JNI.createStaticMethod("org/haxe/lime/GameActivity", "getDisplaySafeAreaInsets", "()[I");
-			var result = getDisplaySafeArea();
-			display.safeArea = new Rectangle(
-				display.bounds.x + result[0],
-				display.bounds.y + result[1],
-				display.bounds.width - result[0] - result[2],
-				display.bounds.height - result[1] - result[3]);
+			#if hl
+			display.name = @:privateAccess String.fromUTF8(displayInfo.name);
 			#else
-			display.safeArea = new Rectangle(
-				displayInfo.safeArea.x,
-				displayInfo.safeArea.y,
-				displayInfo.safeArea.width,
-				displayInfo.safeArea.height);
+			display.name = displayInfo.name;
 			#end
+			display.bounds = new Rectangle(displayInfo.bounds.x, displayInfo.bounds.y, displayInfo.bounds.width, displayInfo.bounds.height);
 
 			#if ios
 			var tablet = NativeCFFI.lime_system_get_ios_tablet();
@@ -343,23 +245,6 @@ class System
 			#if flash
 			display.dpi = Capabilities.screenDPI;
 			display.currentMode = new DisplayMode(Std.int(Capabilities.screenResolutionX), Std.int(Capabilities.screenResolutionY), 60, ARGB32);
-			#if air
-			switch (flash.Lib.current.stage.orientation) {
-				case DEFAULT:
-					display.orientation = PORTRAIT;
-				case UPSIDE_DOWN:
-					display.orientation = PORTRAIT_FLIPPED;
-				case ROTATED_LEFT:
-					display.orientation = LANDSCAPE_FLIPPED;
-				case ROTATED_RIGHT:
-					display.orientation = LANDSCAPE;
-				default:
-					display.orientation = UNKNOWN;
-			}
-
-			#else
-			display.orientation = UNKNOWN;
-			#end
 			#elseif (js && html5)
 			// var div = Browser.document.createElement ("div");
 			// div.style.width = "1in";
@@ -369,26 +254,6 @@ class System
 			// display.dpi = Std.parseFloat (ppi);
 			display.dpi = 96 * Browser.window.devicePixelRatio;
 			display.currentMode = new DisplayMode(Browser.window.screen.width, Browser.window.screen.height, 60, ARGB32);
-			if (Browser.window.screen.orientation != null)
-			{
-				switch (Browser.window.screen.orientation.type)
-				{
-					case PORTRAIT_PRIMARY:
-						display.orientation = PORTRAIT;
-					case PORTRAIT_SECONDARY:
-						display.orientation = PORTRAIT_FLIPPED;
-					case LANDSCAPE_PRIMARY:
-						display.orientation = LANDSCAPE;
-					case LANDSCAPE_SECONDARY:
-						display.orientation = LANDSCAPE_FLIPPED;
-					default:
-						display.orientation = UNKNOWN;
-				}
-			}
-			else
-			{
-				display.orientation = UNKNOWN;
-			}
 			#end
 
 			display.supportedModes = [display.currentMode];
@@ -400,9 +265,6 @@ class System
 		return null;
 	}
 
-	/**
-		The number of milliseconds since the application was initialized.
-	**/
 	public static function getTimer():Int
 	{
 		#if flash
@@ -420,24 +282,6 @@ class System
 		#end
 	}
 
-	public static function getPerformanceCounter():Float
-	{
-		#if (lime_cffi && !macro)
-		return cast NativeCFFI.lime_system_get_performance_counter();
-		#else
-		return 0;
-		#end
-	}
-
-	public static function getPerformanceFrequency():Float
-	{
-		#if (lime_cffi && !macro)
-		return cast NativeCFFI.lime_system_get_performance_frequency();
-		#else
-		return 0;
-		#end
-	}
-
 	#if (!lime_doc_gen || lime_cffi)
 	public static inline function load(library:String, method:String, args:Int = 0, lazy:Bool = false):Dynamic
 	{
@@ -449,11 +293,6 @@ class System
 	}
 	#end
 
-	/**
-		Opens a file with the suste, default application.
-
-		In a web browser, opens a URL with target `_blank`.
-	**/
 	public static function openFile(path:String):Void
 	{
 		if (path != null)
@@ -468,15 +307,15 @@ class System
 			Browser.window.open(path, "_blank");
 			#elseif flash
 			Lib.getURL(new URLRequest(path), "_blank");
+			#elseif android
+			var openFile = JNI.createStaticMethod("org/haxe/lime/GameActivity", "openFile", "(Ljava/lang/String;)V");
+			openFile(path);
 			#elseif (lime_cffi && !macro)
 			NativeCFFI.lime_system_open_file(path);
 			#end
 		}
 	}
 
-	/**
-		Opens a URL with the specified target web browser window.
-	**/
 	public static function openURL(url:String, target:String = "_blank"):Void
 	{
 		if (url != null)
@@ -487,26 +326,13 @@ class System
 			Browser.window.open(url, target);
 			#elseif flash
 			Lib.getURL(new URLRequest(url), target);
+			#elseif android
+			var openURL = JNI.createStaticMethod("org/haxe/lime/GameActivity", "openURL", "(Ljava/lang/String;Ljava/lang/String;)V");
+			openURL(url, target);
 			#elseif (lime_cffi && !macro)
 			NativeCFFI.lime_system_open_url(url, target);
 			#end
 		}
-	}
-
-	public static function getHint(key:String):String
-	{
-		if (key != null)
-		{
-			#if (lime_cffi && !macro)
-			#if (ios || tvos)
-			return NativeCFFI.lime_system_get_hint(key);
-			#else
-			return CFFI.stringValue(NativeCFFI.lime_system_get_hint(key));
-			#end
-			#end
-		}
-
-		return null;
 	}
 
 	@:noCompletion private static function __copyMissingFields(target:Dynamic, source:Dynamic):Void
@@ -551,11 +377,19 @@ class System
 					}
 				}
 
-				path = CFFI.stringValue(NativeCFFI.lime_system_get_directory(type, company, file));
+				#if hl
+				path = @:privateAccess String.fromUTF8(NativeCFFI.lime_system_get_directory(type, company, file));
+				#else
+				path = NativeCFFI.lime_system_get_directory(type, company, file);
+				#end
 			}
 			else
 			{
-				path = CFFI.stringValue(NativeCFFI.lime_system_get_directory(type, null, null));
+				#if hl
+				path = @:privateAccess String.fromUTF8(NativeCFFI.lime_system_get_directory(type, null, null));
+				#else
+				path = NativeCFFI.lime_system_get_directory(type, null, null);
+				#end
 			}
 
 			#if windows
@@ -698,6 +532,11 @@ class System
 
 	@:noCompletion private static function __registerEntryPoint(projectName:String, entryPoint:Function):Void
 	{
+        #if sys
+            #if windows 
+                game.system.native.Windows.setDPIAware(); 
+            #end
+        #end
 		if (__applicationEntryPoint == null)
 		{
 			__applicationEntryPoint = new Map();
@@ -767,10 +606,14 @@ class System
 		if (__deviceModel == null)
 		{
 			#if (lime_cffi && !macro && (windows || ios || tvos))
-			__deviceModel = CFFI.stringValue(NativeCFFI.lime_system_get_device_model());
+			#if hl
+			__deviceModel = @:privateAccess String.fromUTF8(NativeCFFI.lime_system_get_device_model());
+			#else
+			__deviceModel = NativeCFFI.lime_system_get_device_model();
+			#end
 			#elseif android
-			var manufacturer:String = android.os.Build.MANUFACTURER;
-			var model:String = android.os.Build.MODEL;
+			var manufacturer:String = JNI.createStaticField("android/os/Build", "MANUFACTURER", "Ljava/lang/String;").get();
+			var model:String = JNI.createStaticField("android/os/Build", "MODEL", "Ljava/lang/String;").get();
 			if (manufacturer != null && model != null)
 			{
 				if (StringTools.startsWith(model.toLowerCase(), manufacturer.toLowerCase()))
@@ -798,9 +641,13 @@ class System
 		if (__deviceVendor == null)
 		{
 			#if (lime_cffi && !macro && windows && !html5)
-			__deviceVendor = CFFI.stringValue(NativeCFFI.lime_system_get_device_vendor());
+			#if hl
+			__deviceVendor = @:privateAccess String.fromUTF8(NativeCFFI.lime_system_get_device_vendor());
+			#else
+			__deviceVendor = NativeCFFI.lime_system_get_device_vendor();
+			#end
 			#elseif android
-			var vendor:String = android.os.Build.MANUFACTURER;
+			var vendor:String = JNI.createStaticField("android/os/Build", "MANUFACTURER", "Ljava/lang/String;").get();
 			if (vendor != null)
 			{
 				__deviceVendor = vendor.charAt(0).toUpperCase() + vendor.substr(1);
@@ -880,7 +727,11 @@ class System
 		if (__platformLabel == null)
 		{
 			#if (lime_cffi && !macro && windows && !html5)
-			var label:String = CFFI.stringValue(NativeCFFI.lime_system_get_platform_label());
+			#if hl
+			var label:String = @:privateAccess String.fromUTF8(NativeCFFI.lime_system_get_platform_label());
+			#else
+			var label:String = NativeCFFI.lime_system_get_platform_label();
+			#end
 			if (label != null) __platformLabel = StringTools.trim(label);
 			#elseif linux
 			__platformLabel = __runProcess("lsb_release", ["-ds"]);
@@ -938,11 +789,15 @@ class System
 		if (__platformVersion == null)
 		{
 			#if (lime_cffi && !macro && windows && !html5)
-			__platformVersion = CFFI.stringValue(NativeCFFI.lime_system_get_platform_version());
+			#if hl
+			__platformVersion = @:privateAccess String.fromUTF8(NativeCFFI.lime_system_get_platform_version());
+			#else
+			__platformVersion = NativeCFFI.lime_system_get_platform_version();
+			#end
 			#elseif android
-			var release = android.os.Build.VERSION.RELEASE;
-			var api = android.os.Build.VERSION.SDK_INT;
-			/*if (release != null && api != null)*/ __platformVersion = release + " (API " + api + ")";
+			var release = JNI.createStaticField("android/os/Build$VERSION", "RELEASE", "Ljava/lang/String;").get();
+			var api = JNI.createStaticField("android/os/Build$VERSION", "SDK_INT", "I").get();
+			if (release != null && api != null) __platformVersion = release + " (API " + api + ")";
 			#elseif (lime_cffi && !macro && (ios || tvos))
 			__platformVersion = NativeCFFI.lime_system_get_platform_version();
 			#elseif mac
@@ -966,15 +821,6 @@ class System
 
 		return __userDirectory;
 	}
-}
-
-#if (haxe_ver >= 4.0) enum #else @:enum #end abstract DisplayOrientation(Int) from Int to Int from UInt to UInt
-{
-	var DISPLAY_ORIENTATION_UNKNOWN = 0;
-	var DISPLAY_ORIENTATION_LANDSCAPE = 1;
-	var DISPLAY_ORIENTATION_LANDSCAPE_FLIPPED = 2;
-	var DISPLAY_ORIENTATION_PORTRAIT = 3;
-	var DISPLAY_ORIENTATION_PORTRAIT_FLIPPED = 4;
 }
 
 #if (haxe_ver >= 4.0) private enum #else @:enum private #end abstract SystemDirectory(Int) from Int to Int from UInt to UInt
