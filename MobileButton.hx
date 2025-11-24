@@ -1,22 +1,19 @@
-package mobile.flixel;
+package mobile.objects;
 
-import flixel.graphics.atlas.FlxAtlas;
-import flixel.graphics.atlas.FlxNode;
-import flixel.graphics.frames.FlxTileFrames;
 import flixel.input.FlxInput;
 import flixel.input.FlxPointer;
 import flixel.input.IFlxInput;
-import flixel.input.touch.FlxTouch;
-import flixel.math.FlxPoint;
 import flixel.util.FlxDestroyUtil.IFlxDestroyable;
-#if BMC_ALLOW_MOUSE_CLICKS
+import shaders.flixel.system.FlxShader;
+#if mac
 import flixel.input.mouse.FlxMouseButton;
 #end
 
 /**
  * A simple button class that calls a function when clicked by the touch.
+ * @author: KralOyuncu2010x (ArkoseLabs)
  */
-class FlxButton extends FlxTypedButton<FlxText>
+class MobileButton extends TypedMobileButton<FlxSprite>
 {
 	/**
 	 * Used with public variable status, means not highlighted or pressed.
@@ -34,70 +31,50 @@ class FlxButton extends FlxTypedButton<FlxText>
 	public static inline var PRESSED:Int = 2;
 
 	/**
-	 * Shortcut to setting label.text
-	 */
-	public var text(get, set):String;
-
+	 * A simple tag that returns the button's graphic name in upper case.
+	**/
 	public var tag:String;
-	public var IDs:Array<String> = [];
 
 	/**
-	 * Creates a new `FlxButton` object with a gray background
+	 * The `MobileInputID` that are assigned to this button.
+	**/
+	public var IDs:Array<MobileInputID> = [];
+
+	/**
+	 * The `String` that are assigned to this button. (used for extra controls bc they're doesn't have a number)
+	**/
+	public var strName:String = null;
+
+	/**
+	 * A Small invisible bounds used for colision
+	**/
+	public var bounds:FlxSprite = new FlxSprite();
+
+	/**
+	 * Creates a new `MobileButton` object
 	 * and a callback function on the UI thread.
 	 *
-	 * @param   X         The x position of the button.
-	 * @param   Y         The y position of the button.
-	 * @param   ID        The button's IDs(used for input handling so be careful).
-	 * @param   Text      The text that you want to appear on the button.
-	 * @param   OnClick   The function to call whenever the button is clicked.
+	 * @param   X		 The x position of the button.
+	 * @param   Y		 The y position of the button.
+	 * @param   IDs        The button's IDs(used for input handling so be careful).
+	 * @param   strNames       The button's strNames(used for input handling so be careful & do not use this with IDs, otherwise buttons can be broken).
 	 */
-	public function new(X:Float = 0, Y:Float = 0, ?Text:String, ?OnClick:Void->Void):Void
+	public function new(X:Float = 0, Y:Float = 0, ?IDs:Array<MobileInputID> = null, ?strName:String):Void
 	{
-		super(X, Y, OnClick);
+		super(X, Y);
 
-		for (point in labelOffsets)
-			point.set(point.x - 1, point.y + 3);
-
-		initLabel(Text);
+		this.IDs = IDs == null ? [] : IDs;
+		this.strName = strName == null ? null : strName;
 	}
 
-	/**
-	 * Updates the size of the text field to match the button.
-	 */
-	override function resetHelpers():Void
+	public inline function centerInBounds()
 	{
-		super.resetHelpers();
-
-		if (label != null)
-		{
-			label.fieldWidth = label.frameWidth = Std.int(width);
-			label.size = label.size; // Calls set_size(), don't remove!
-		}
+		setPosition(bounds.x + ((bounds.width - frameWidth) / 2), bounds.y + ((bounds.height - frameHeight) / 2));
 	}
 
-	inline function initLabel(Text:String):Void
+	public inline function centerBounds()
 	{
-		if (Text != null)
-		{
-			label = new FlxText(x + labelOffsets[NORMAL].x, y + labelOffsets[NORMAL].y, 80, Text);
-			label.setFormat(null, 8, 0x333333, 'center');
-			label.alpha = labelAlphas[status];
-			label.drawFrame(true);
-		}
-	}
-
-	inline function get_text():String
-	{
-		return (label != null) ? label.text : null;
-	}
-
-	inline function set_text(Text:String):String
-	{
-		if (label == null)
-			initLabel(Text);
-		else
-			label.text = Text;
-		return Text;
+		bounds.setPosition(x + ((frameWidth - bounds.width) / 2), y + ((frameHeight - bounds.height) / 2));
 	}
 }
 
@@ -107,7 +84,7 @@ class FlxButton extends FlxTypedButton<FlxText>
 #if !display
 @:generic
 #end
-class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
+class TypedMobileButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 {
 	/**
 	 * The label that appears on the button. Can be any `FlxSprite`.
@@ -148,32 +125,61 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	 * Defaults to `Math.POSITIVE_INFINITY` (i.e. no limit).
 	 */
 	public var maxInputMovement:Float = Math.POSITIVE_INFINITY;
-
+	
 	/**
-	 * Shows the current state of the button, either `FlxButton.NORMAL`,
-	 * `FlxButton.HIGHLIGHT` or `FlxButton.PRESSED`.
+	 * Shows the current state of the button, either `MobileButton.NORMAL`,
+	 * `MobileButton.HIGHLIGHT` or `MobileButton.PRESSED`.
 	 */
 	public var status(default, set):Int;
 
 	/**
 	 * The properties of this button's `onUp` event (callback function, sound).
 	 */
-	public var onUp(default, null):FlxButtonEvent;
+	public var onUp(default, null):MobileButtonEvent;
 
 	/**
 	 * The properties of this button's `onDown` event (callback function, sound).
 	 */
-	public var onDown(default, null):FlxButtonEvent;
+	public var onDown(default, null):MobileButtonEvent;
 
 	/**
 	 * The properties of this button's `onOver` event (callback function, sound).
 	 */
-	public var onOver(default, null):FlxButtonEvent;
+	public var onOver(default, null):MobileButtonEvent;
 
 	/**
 	 * The properties of this button's `onOut` event (callback function, sound).
 	 */
-	public var onOut(default, null):FlxButtonEvent;
+	public var onOut(default, null):MobileButtonEvent;
+
+	/**
+	 * The alpha's the button should use depednging on the status.
+	**/
+	public var statusAlphas:Array<Float> = [1.0, 1.0, 0.6];
+
+	/**
+	 * The brightness the button should use depednging on the status.
+	**/
+	public var statusBrightness:Array<Float> = [1.0, 0.95, 0.7];
+
+	/**
+	 * How much to add/substract from the current indicator value for the label.
+	**/
+	public var labelStatusDiff:Float = 0.05;
+
+	/**
+	 * IF YOU'RE USING SPRITE GROUPS YOU MUST SET THIS TO THE GROUP'S ALPHA LIKE IN MobilePad.
+	**/
+	public var parentAlpha(default, set):Float = 1;
+
+	/**
+	 * Custom Button Return (For Easier Lua Support).
+	**/
+	public var returnedButton:String;
+
+	public var statusIndicatorType(default, set):StatusIndicators = ALPHA;
+
+	public var brightShader:ButtonBrightnessShader = new ButtonBrightnessShader();
 
 	public var justReleased(get, never):Bool;
 	public var released(get, never):Bool;
@@ -181,9 +187,20 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	public var justPressed(get, never):Bool;
 
 	/**
+	 * An array of objects that blocks your input.
+	 */
+	public var deadZones:Array<FlxSprite> = [];
+
+	/**
 	 * We cast label to a `FlxSprite` for internal operations to avoid Dynamic casts in C++
 	 */
 	var _spriteLabel:FlxSprite;
+	
+	/**
+	 * A hint shits, did you expect something?
+	 */
+	public var hintUp:FlxSprite;
+	public var hintDown:FlxSprite;
 
 	/** 
 	 * We don't need an ID here, so let's just use `Int` as the type.
@@ -195,40 +212,33 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	 */
 	var currentInput:IFlxInput;
 
-	#if BMC_ALLOW_MOUSE_CLICKS
-	/**
-	* Which mouse buttons can trigger the button - by default only the left mouse button.
-	*/
-	public var mouseButtons:Array<FlxMouseButtonID> = [FlxMouseButtonID.LEFT];
-	#end
-
 	var lastStatus = -1;
+	public var canChangeLabelAlpha:Bool = true;
 
 	/**
 	 * Creates a new `FlxTypedButton` object with a gray background.
 	 *
-	 * @param   X         The x position of the button.
-	 * @param   Y         The y position of the button.
-	 * @param   OnClick   The function to call whenever the button is clicked.
+	 * @param   X		 The x position of the button.
+	 * @param   Y		 The y position of the button.
 	 */
-	public function new(X:Float = 0, Y:Float = 0, ?OnClick:Void->Void):Void
+	public function new(X:Float = 0, Y:Float = 0):Void
 	{
 		super(X, Y);
 
 		loadDefaultGraphic();
 
-		onUp = new FlxButtonEvent(OnClick);
-		onDown = new FlxButtonEvent();
-		onOver = new FlxButtonEvent();
-		onOut = new FlxButtonEvent();
+		onUp = new MobileButtonEvent();
+		onDown = new MobileButtonEvent();
+		onOver = new MobileButtonEvent();
+		onOut = new MobileButtonEvent();
 
-		status = multiTouch ? FlxButton.NORMAL : FlxButton.HIGHLIGHT;
+		status = multiTouch ? MobileButton.NORMAL : MobileButton.HIGHLIGHT;
 
 		// Since this is a UI element, the default scrollFactor is (0, 0)
 		scrollFactor.set();
 
-		statusAnimations[FlxButton.HIGHLIGHT] = 'normal';
-		labelAlphas[FlxButton.HIGHLIGHT] = 1;
+		statusAnimations[MobileButton.HIGHLIGHT] = 'normal';
+		labelAlphas[MobileButton.HIGHLIGHT] = 1;
 
 		input = new FlxInput(0);
 	}
@@ -237,9 +247,8 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	{
 		super.graphicLoaded();
 
-		setupAnimation('normal', FlxButton.NORMAL);
-		setupAnimation('highlight', FlxButton.HIGHLIGHT);
-		setupAnimation('pressed', FlxButton.PRESSED);
+		setupAnimation('normal', MobileButton.NORMAL);
+		setupAnimation('pressed', MobileButton.PRESSED);
 	}
 
 	function loadDefaultGraphic():Void
@@ -259,6 +268,8 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	{
 		label = FlxDestroyUtil.destroy(label);
 		_spriteLabel = null;
+		hintUp = null;
+		hintDown = null;
 
 		onUp = FlxDestroyUtil.destroy(onUp);
 		onDown = FlxDestroyUtil.destroy(onDown);
@@ -266,8 +277,9 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		onOut = FlxDestroyUtil.destroy(onOut);
 
 		labelOffsets = FlxDestroyUtil.putArray(labelOffsets);
-
 		labelAlphas = null;
+
+		deadZones = FlxDestroyUtil.destroyArray(deadZones);
 		currentInput = null;
 		input = null;
 
@@ -314,6 +326,18 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 			_spriteLabel.cameras = cameras;
 			_spriteLabel.draw();
 		}
+
+		if (hintUp != null && hintUp.visible)
+		{
+			hintUp.cameras = cameras;
+			hintUp.draw();
+		}
+
+		if (hintDown != null && hintDown.visible)
+		{
+			hintDown.cameras = cameras;
+			hintDown.draw();
+		}
 	}
 
 	#if FLX_DEBUG
@@ -326,41 +350,14 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 
 		if (_spriteLabel != null)
 			_spriteLabel.drawDebug();
+
+		if (hintUp != null)
+			hintUp.drawDebug();
+
+		if (hintDown != null)
+			hintDown.drawDebug();
 	}
 	#end
-
-	/**
-	 * Stamps button's graphic and label onto specified atlas object and loads graphic from this atlas.
-	 * This method assumes that you're using whole image for button's graphic and image has no spaces between frames.
-	 * And it assumes that label is a single frame sprite.
-	 *
-	 * @param   atlas   Atlas to stamp graphic to.
-	 * @return  Whether the button's graphic and label's graphic were stamped on the atlas successfully.
-	 */
-	public function stampOnAtlas(atlas:FlxAtlas):Bool
-	{
-		var buttonNode:FlxNode = atlas.addNode(graphic.bitmap, graphic.key);
-		var result:Bool = (buttonNode != null);
-
-		if (buttonNode != null)
-		{
-			var buttonFrames:FlxTileFrames = cast frames;
-			var tileSize:FlxPoint = FlxPoint.get(buttonFrames.tileSize.x, buttonFrames.tileSize.y);
-			var tileFrames:FlxTileFrames = buttonNode.getTileFrames(tileSize);
-			this.frames = tileFrames;
-		}
-
-		if (result && label != null)
-		{
-			var labelNode:FlxNode = atlas.addNode(label.graphic.bitmap, label.graphic.key);
-			result = result && (labelNode != null);
-
-			if (labelNode != null)
-				label.frames = labelNode.getImageFrame();
-		}
-
-		return result;
-	}
 
 	/**
 	 * Basic button update logic - searches for overlaps with touches and
@@ -368,50 +365,41 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	 */
 	function updateButton():Void
 	{
-		#if BMC_ALLOW_MOUSE_CLICKS
-		var overlapFound = checkMouseOverlap();
-		if (!overlapFound)
-			overlapFound = checkTouchOverlap();
-		#else
 		var overlapFound = checkTouchOverlap();
-		#end
 
 		if (currentInput != null && currentInput.justReleased && overlapFound)
 			onUpHandler();
 
-		if (status != FlxButton.NORMAL && (!overlapFound || (currentInput != null && currentInput.justReleased)))
+		if (status != MobileButton.NORMAL && (!overlapFound || (currentInput != null && currentInput.justReleased)))
 			onOutHandler();
 	}
-
-	#if BMC_ALLOW_MOUSE_CLICKS
-	function checkMouseOverlap():Bool
-	{
-		var overlap = false;
-		#if FLX_MOUSE
-		for (camera in cameras)
-		{
-			for (buttonID in mouseButtons)
-			{
-				var button = FlxMouseButton.getByID(buttonID);
-				if (button != null && checkInput(FlxG.mouse, button, button.justPressedPosition, camera))
-				{
-					overlap = true;
-				}
-			}
-		}
-		#end
-		return overlap;
-	}
-	#end
 
 	function checkTouchOverlap():Bool
 	{
 		var overlap = false;
 
-		for (camera in cameras)
-			for (touch in FlxG.touches.list)
+		for (camera in cameras) {
+			#if mac
+			var button = FlxMouseButton.getByID(FlxMouseButtonID.LEFT);
+
+			if (checkInput(FlxG.mouse, button, button.justPressedPosition, camera))
+				overlap = true;
+			#else
+			for (touch in FlxG.touches.list) {
+				final worldPos:FlxPoint = touch.getWorldPosition(camera, _point);
+
+				for (zone in deadZones) {
+					if (zone != null) {
+						if (zone.overlapsPoint(worldPos, true, camera))
+							return false;
+					}
+				}
+
 				if (checkInput(touch, touch, touch.justPressedPosition, camera))
 					overlap = true;
+			}
+			#end
+		}
 
 		return overlap;
 	}
@@ -443,7 +431,7 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 			currentInput = input;
 			onDownHandler();
 		}
-		else if (status == FlxButton.NORMAL)
+		else if (status == MobileButton.NORMAL)
 		{
 			// Allow 'swiping' to press a button (dragging it over the button while pressed)
 			if (allowSwiping && input.pressed)
@@ -453,9 +441,9 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		}
 	}
 
-	function updateLabelPosition()
+	public function updateLabelPosition()
 	{
-		if (_spriteLabel != null) // Label positioning
+		if (_spriteLabel != null)
 		{
 			_spriteLabel.x = (pixelPerfectPosition ? Math.floor(x) : x) + labelOffsets[status].x;
 			_spriteLabel.y = (pixelPerfectPosition ? Math.floor(y) : y) + labelOffsets[status].y;
@@ -467,13 +455,31 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		if (_spriteLabel != null && labelAlphas.length > status)
 			_spriteLabel.alpha = alpha * labelAlphas[status];
 	}
+	
+	public function updateLabelScale()
+	{
+		if (_spriteLabel != null)
+			_spriteLabel.scale.set(scale.x, scale.y);
+	}
+
+	public function indicateStatus()
+	{
+		switch (statusIndicatorType)
+		{
+			case ALPHA:
+				alpha = statusAlphas[status];
+			case BRIGHTNESS:
+				brightShader.brightness.value = [statusBrightness[status]];
+			case NONE: // no balls
+		}
+	}
 
 	/**
 	 * Internal function that handles the onUp event.
 	 */
 	function onUpHandler():Void
 	{
-		status = FlxButton.NORMAL;
+		status = MobileButton.NORMAL;
 		input.release();
 		currentInput = null;
 		onUp.fire(); // Order matters here, because onUp.fire() could cause a state change and destroy this object.
@@ -484,7 +490,7 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	 */
 	function onDownHandler():Void
 	{
-		status = FlxButton.PRESSED;
+		status = MobileButton.PRESSED;
 		input.press();
 		onDown.fire(); // Order matters here, because onDown.fire() could cause a state change and destroy this object.
 	}
@@ -494,7 +500,7 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	 */
 	function onOverHandler():Void
 	{
-		status = FlxButton.HIGHLIGHT;
+		status = MobileButton.HIGHLIGHT;
 		onOver.fire(); // Order matters here, because onOver.fire() could cause a state change and destroy this object.
 	}
 
@@ -503,7 +509,7 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	 */
 	function onOutHandler():Void
 	{
-		status = FlxButton.NORMAL;
+		status = MobileButton.NORMAL;
 		input.release();
 		onOut.fire(); // Order matters here, because onOut.fire() could cause a state change and destroy this object.
 	}
@@ -538,6 +544,11 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		updateLabelAlpha();
 		return alpha;
 	}
+	
+	override function set_visible(Value:Bool):Bool
+	{
+	 	return Value;
+	}
 
 	override function set_x(Value:Float):Float
 	{
@@ -551,6 +562,70 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		super.set_y(Value);
 		updateLabelPosition();
 		return y;
+	}
+	
+	override function set_color(Value:FlxColor):Int
+	{
+		if (_spriteLabel != null)
+	 		_spriteLabel.color = Value;
+	 	
+	 	super.set_color(Value);
+		return Value;
+	}
+
+	override private function set_width(Value:Float)
+	{
+	 	super.set_width(Value);
+	 	updateLabelScale();
+	 	return Value;
+	}
+
+	override private function set_height(Value:Float)
+	{
+		super.set_height(Value);
+	 	updateLabelScale();
+	 	return Value;
+	}
+
+	override public function updateHitbox()
+	{
+		super.updateHitbox();
+		if (_spriteLabel != null)
+			_spriteLabel.updateHitbox();
+		if (hintUp != null)
+			hintUp.updateHitbox();
+		if (hintDown != null)
+			hintDown.updateHitbox();
+	}
+
+	function set_parentAlpha(Value:Float):Float
+	{
+		statusAlphas = [
+			Value,
+			Value - 0.05,
+			(parentAlpha - 0.45 == 0 && parentAlpha > 0)
+			? 0.25 : parentAlpha - 0.45
+		];
+		indicateStatus();
+		return parentAlpha = Value;
+	}
+
+	function set_statusIndicatorType(Value:StatusIndicators)
+	{
+		if (Value == BRIGHTNESS)
+		{
+			shader = brightShader;
+			if (_spriteLabel != null)
+				_spriteLabel.shader = brightShader;
+		}
+		else
+		{
+			shader = null;
+			if (_spriteLabel != null)
+				_spriteLabel.shader = null;
+		}
+		statusIndicatorType = Value;
+		return Value;
 	}
 
 	inline function get_justReleased():Bool
@@ -567,9 +642,9 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 }
 
 /** 
- * Helper function for `FlxButton` which handles its events.
+ * Helper function for `MobileButton` which handles its events.
  */
-private class FlxButtonEvent implements IFlxDestroyable
+private class MobileButtonEvent implements IFlxDestroyable
 {
 	/**
 	 * The callback function to call when this even fires.
@@ -585,7 +660,7 @@ private class FlxButtonEvent implements IFlxDestroyable
 
 	/**
 	 * @param   Callback   The callback function to call when this even fires.
-	 * @param   sound      The sound to play when this event fires.
+	 * @param   sound	  The sound to play when this event fires.
 	 */
 	public function new(?Callback:Void->Void, ?sound:FlxSound):Void
 	{
@@ -621,4 +696,50 @@ private class FlxButtonEvent implements IFlxDestroyable
 			sound.play(true);
 		#end
 	}
+}
+
+class ButtonBrightnessShader extends FlxShader
+{
+	public var color(default, set):Null<FlxColor> = FlxColor.WHITE;
+
+	@:glFragmentSource('
+		#pragma header
+
+		uniform float brightness;
+
+		void main()
+		{
+			vec4 col = flixel_texture2D(bitmap, openfl_TextureCoordv);
+			col.rgb *= brightness;
+
+			gl_FragColor = col;
+		}
+	')
+	public function new()
+	{
+		super();
+	}
+
+	private function set_color(?laColor:FlxColor)
+	{
+		if (laColor == null)
+		{
+			colorMultiplier.value = [1, 1, 1, 1];
+			hasColorTransform.value = hasTransform.value = [false];
+			return color = laColor;
+		}
+		hasColorTransform.value = hasTransform.value = [true];
+		colorMultiplier.value = [laColor.redFloat, laColor.blueFloat, laColor.greenFloat, laColor.alphaFloat];
+		return color = laColor;
+	}
+}
+
+enum StatusIndicators
+{
+	// isn't very good looking
+	ALPHA;
+	// best one in my opinion
+	BRIGHTNESS;
+	// used when u make ur own status indicator like in hitbox
+	NONE;
 }
