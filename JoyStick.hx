@@ -2,7 +2,7 @@ package mobile;
 
 import flixel.FlxG;
 import flixel.FlxSprite;
-import flixel.group.FlxSpriteGroup; // We will use this in a way to make the thumb and base group up
+import flixel.group.FlxSpriteGroup;
 import flixel.input.touch.FlxTouch;
 import flixel.math.FlxAngle;
 import flixel.math.FlxMath;
@@ -31,12 +31,6 @@ class JoyStick extends MobileButton
 	 * A list of analogs that are currently active (retained for multi-touch management).
 	 */
 	static var analogs:Array<JoyStick> = [];
-
-	/**
-	 * The current pointer that's active on the analog.
-	 * Inherited from TypedMobileButton: `currentInput`
-	 */
-	// var currentTouch:FlxTouch; 
     
 	/**
 	 * The area which the joystick will react.
@@ -73,14 +67,13 @@ class JoyStick extends MobileButton
 	public var size(default, set):Float = 1;
 	function set_size(Value:Float) {
 		size = Value;
-		scale.set(Value, Value); // Scale the button (base)
+		scale.set(Value, Value);
 		if (label != null)
 			label.scale.set(Value, Value);
 
 		if (radius == 0)
 			radius = (width * 0.5) * Value;
 
-		// Update the zone based on the base size
 		createZone(); 
 		return Value;
 	}
@@ -96,7 +89,6 @@ class JoyStick extends MobileButton
 	 */
 	public function new(X:Float = 0, Y:Float = 0, Radius:Float = 0, Ease:Float = 0.25, Size:Float = 1, ?Return:String)
 	{
-		// MobileButton handles X, Y, and status management.
 		super(X, Y, Return); 
 
 		radius = Radius;
@@ -106,13 +98,10 @@ class JoyStick extends MobileButton
 
 		_point = FlxPoint.get();
 		
-		// The base is 'this' (the MobileButton sprite)
 		loadDefaultGraphic();
 		createThumb();
 		size = Size;
 		
-		// Ensure the joystick logic doesn't interfere with the button's size
-		// We set the hitbox to match the graphic size.
 		updateHitbox(); 
 
 		scrollFactor.set();
@@ -136,7 +125,6 @@ class JoyStick extends MobileButton
 			loadGraphic(FlxGraphic.fromFrame(FlxAtlasFrames.fromSparrow(Assets.getBitmapData(pngFile), Assets.getText(xmlFile)).getByName('base')));
 
 		resetSizeFromFrame();
-		// Center the base graphic on the X, Y coordinates
 		x += -width * 0.5;
 		y += -height * 0.5;
 		
@@ -149,7 +137,9 @@ class JoyStick extends MobileButton
 	 */
 	function createThumb():Void
 	{
-		label = new FlxSprite(x + width * 0.5, y + height * 0.5); // Start at the center of the base
+		if (label == null) {
+			label = new FlxSprite();
+		}
 
 		var xmlFile:String = MobileConfig.mobileFolderPath + 'JoyStick/joystick.xml';
 		var pngFile:String = MobileConfig.mobileFolderPath + 'JoyStick/joystick.png';
@@ -163,8 +153,6 @@ class JoyStick extends MobileButton
 			label.loadGraphic(FlxGraphic.fromFrame(FlxAtlasFrames.fromSparrow(Assets.getBitmapData(pngFile), Assets.getText(xmlFile)).getByName('thumb')));
 
 		label.resetSizeFromFrame();
-		label.x += -label.width * 0.5;
-		label.y += -label.height * 0.5;
 		label.scrollFactor.set();
 		label.solid = false;
 		#if FLX_DEBUG
@@ -209,47 +197,80 @@ class JoyStick extends MobileButton
 	}
 
 	/**
+	 * X pozisyonu değiştiğinde hem MobileButton'ın davranışını sürdürür hem de parmaklığı günceller.
+	 */
+	override public function set_x(Value:Float):Float
+	{
+		super.set_x(Value); 
+        
+        var centerX:Float = x + width * 0.5;
+
+		if (label != null)
+        {
+            label.x = centerX - (label.width * 0.5);
+            updateLabelPosition(); 
+        }
+
+		createZone(); 
+
+		return x;
+	}
+
+	/**
+	 * Y pozisyonu değiştiğinde hem MobileButton'ın davranışını sürdürür hem de parmaklığı günceller.
+	 */
+	override public function set_y(Value:Float):Float
+	{
+		super.set_y(Value);
+
+        var centerY:Float = y + height * 0.5;
+
+		if (label != null)
+        {
+            label.y = centerY - (label.height * 0.5);
+            updateLabelPosition();
+        }
+
+		createZone(); 
+
+		return y;
+	}
+
+	/**
 	 * Called by the game loop automatically, handles touch over and click detection,
 	 * AND updates the joystick position.
 	 */
 	override public function update(elapsed:Float):Void
 	{
-		super.update(elapsed); // Runs MobileButton's touch/status logic first
+		super.update(elapsed);
 
-		var touchPoint:FlxPoint = null;
+		var touch:FlxTouch = cast(currentInput, FlxTouch);
 		
-		// If the button is currently pressed (status == MobileButton.PRESSED) and has an active input
-		// we calculate the joystick's movement.
-		if (status == MobileButton.PRESSED) 
+		var centerX:Float = x + width * 0.5;
+		var centerY:Float = y + height * 0.5;
+
+		if (status == MobileButton.PRESSED && touch != null) 
 		{
-			var currentTouch = cast(currentInput, FlxTouch);
-			if (currentTouch != null)
-			{
-				// Get the world position of the touch that pressed this button
-				touchPoint = currentTouch.getWorldPosition(FlxG.camera, FlxPoint.weak());
+			var touchWorldPos:FlxPoint = touch.getWorldPosition(FlxG.camera, FlxPoint.weak());
 
-				var centerX:Float = x + width * 0.5;
-				var centerY:Float = y + height * 0.5;
-				
-				var dx:Float = touchPoint.x - centerX;
-				var dy:Float = touchPoint.y - centerY;
+			var dx:Float = touchWorldPos.x - centerX;
+			var dy:Float = touchWorldPos.y - centerY;
 
-				var dist:Float = Math.sqrt(dx * dx + dy * dy);
+			var dist:Float = Math.sqrt(dx * dx + dy * dy);
 
-				if (dist < 1)
-					dist = 0;
+			if (dist < 1)
+				dist = 0;
 
-				inputAngle = Math.atan2(dy, dx);
-				intensity = Math.min(radius * scale.x, dist) / (radius * scale.x);
-				
-				// Optional: Set acceleration for external consumption (like your original code)
-				acceleration.x = Math.cos(inputAngle) * intensity;
-				acceleration.y = Math.sin(inputAngle) * intensity;
-			}
+			inputAngle = Math.atan2(dy, dx);
+			var maxDistance:Float = radius * scale.x; 
+			intensity = Math.min(maxDistance, dist) / maxDistance;
+			
+			acceleration.x = Math.cos(inputAngle) * intensity;
+			acceleration.y = Math.sin(inputAngle) * intensity;
+			
+			touchWorldPos.put();
 		}
-		
-		// If not pressed, ease the intensity back to zero (and center the thumb)
-		if (status == MobileButton.NORMAL || status == MobileButton.HIGHLIGHT)
+		else 
 		{
 			intensity -= intensity * easeSpeed * FlxG.updateFramerate / 60;
 
@@ -260,18 +281,18 @@ class JoyStick extends MobileButton
 			}
 			acceleration.set();
 		}
-
-		// Update the thumb position
-		var centerX:Float = x + width * 0.5;
-		var centerY:Float = y + height * 0.5;
 		
-		label.x = centerX + Math.cos(inputAngle) * intensity * (radius * scale.x) - (label.width * 0.5);
-		label.y = centerY + Math.sin(inputAngle) * intensity * (radius * scale.x) - (label.height * 0.5);
-		
-		label.update(elapsed); // Keep the thumb up-to-date
+		if (label != null)
+		{
+			var finalX:Float = centerX + Math.cos(inputAngle) * intensity * (radius * scale.x);
+			var finalY:Float = centerY + Math.sin(inputAngle) * intensity * (radius * scale.x);
+			
+			label.x = finalX - (label.width * 0.5 * scale.x);
+			label.y = finalY - (label.height * 0.5 * scale.y);
+			
+			label.update(elapsed);
+		}
 	}
-	
-	// --- Directional Accessors (Moved from old JoyStick) ---
 	
 	/**
 	 * Whether the joystick is pointing up.
@@ -317,8 +338,6 @@ class JoyStick extends MobileButton
 		return intensity > deadZone.x && Math.cos(inputAngle) > deadZone.x;
 	}
 
-	// joyStickJustPressed, joyStickPressed, joyStickJustReleased remain the same logic
-	
 	/**
 	 * Check if a specific direction was just pressed.
 	 * @param Direction The direction to check ('up', 'down', 'left', 'right')
