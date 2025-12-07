@@ -147,25 +147,6 @@ class TypedMobileButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	 * `MobileButton.HIGHLIGHT` or `MobileButton.PRESSED`.
 	 */
 	public var status(default, set):Int;
-    
-    // --- STATUS INDICATOR MANTIK EKLENTİSİ BAŞLANGIÇ ---
-	
-	/**
-	 * The alpha's the button should use depednging on the status.
-	**/
-	public var statusAlphas:Array<Float> = [1.0, 1.0, 0.6];
-
-	/**
-	 * IF YOU'RE USING SPRITE GROUPS YOU MUST SET THIS TO THE GROUP'S ALPHA.
-	**/
-	public var parentAlpha(default, set):Float = 1;
-
-	/**
-	 * Sets how the button visually indicates its status (ALPHA or NONE).
-	**/
-	public var statusIndicatorType(default, set):StatusIndicators = ALPHA;
-	
-    // --- STATUS INDICATOR MANTIK EKLENTİSİ BİTİŞ ---
 
 	/**
 	 * The properties of this button's `onUp` event (callback function, sound).
@@ -213,7 +194,8 @@ class TypedMobileButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	public var hintUp:FlxSprite;
 	public var hintDown:FlxSprite;
 
-	/** * We don't need an ID here, so let's just use `Int` as the type.
+	/** 
+	 * We don't need an ID here, so let's just use `Int` as the type.
 	 */
 	var input:FlxInput<Int>;
 
@@ -250,10 +232,6 @@ class TypedMobileButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		onOut = new MobileButtonEvent();
 
 		status = multiTouch ? MobileButton.NORMAL : MobileButton.HIGHLIGHT;
-        
-        // STATUS INDICATOR EKLEMESİ:
-        if (statusIndicatorType == ALPHA)
-            indicateStatus();
 
 		// Since this is a UI element, the default scrollFactor is (0, 0)
 		scrollFactor.set();
@@ -489,18 +467,6 @@ class TypedMobileButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 				onOverHandler();
 		}
 	}
-    
-    // --- YENİ FONKSİYON: indicateStatus ---
-	function indicateStatus()
-	{
-		switch (statusIndicatorType)
-		{
-			case ALPHA:
-				alpha = statusAlphas[status];
-			case NONE: // Ekstra görsel işlem yok
-		}
-	}
-    // ----------------------------------------
 
 	public function updateLabelPosition()
 	{
@@ -580,31 +546,22 @@ class TypedMobileButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		return Value;
 	}
 
-    // --- SET STATUS GÜNCELLEMESİ ---
 	function set_status(Value:Int):Int
 	{
 		status = Value;
-		
-        // ALPHA INDICATOR'ü buradan çağır
-		indicateStatus();
-        
 		updateLabelAlpha();
 		return status;
 	}
 
-    // --- SET ALPHA GÜNCELLEMESİ ---
 	override function set_alpha(Value:Float):Float
 	{
 		super.set_alpha(Value);
-        // Alpha doğrudan set edildiğinde label'ı da güncelle
 		updateLabelAlpha();
 		return alpha;
 	}
 	
 	override function set_visible(Value:Bool):Bool
 	{
-		// return Value; (Orijinal kodunuzda bu vardı, ancak FlxSprite'ın set_visible'ı çağrılmıyordu. Düzeltme yapmadım.)
-        super.set_visible(Value);
 		return Value;
 	}
 
@@ -656,32 +613,6 @@ class TypedMobileButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 			hintDown.updateHitbox();
 	}
 
-    // --- SET PARENT ALPHA EKLEMESİ ---
-    function set_parentAlpha(Value:Float):Float
-	{
-		// Status Alpha'ları parentAlpha'ya göre ayarla:
-		statusAlphas = [
-			Value, // NORMAL
-			Value - 0.05, // HIGHLIGHT
-			Value - 0.45 // PRESSED
-		];
-		
-        parentAlpha = Value;
-		indicateStatus();
-		return parentAlpha;
-	}
-    // ------------------------------------
-
-    // --- SET STATUS INDICATOR TYPE EKLEMESİ ---
-    function set_statusIndicatorType(Value:StatusIndicators)
-	{
-		// Sadece ALPHA ve NONE'u ele alıyoruz.
-		statusIndicatorType = Value;
-        indicateStatus(); 
-		return Value;
-	}
-    // --------------------------------------------
-
 	inline function get_justReleased():Bool
 		return input.justReleased;
 
@@ -695,21 +626,59 @@ class TypedMobileButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		return input.justPressed;
 }
 
-/** * Helper function for `MobileButton` which handles its events.
+/** 
+ * Helper function for `MobileButton` which handles its events.
  */
 private class MobileButtonEvent implements IFlxDestroyable
 {
-// ... (MobileButtonEvent içeriği aynı kalır)
-// ...
-}
+	/**
+	 * The callback function to call when this even fires.
+	 */
+	public var callback:Void->Void;
 
-// --- YENİ ENUM TANIMI ---
-/**
- * Indicates how the button should visually reflect its status (NORMAL, HIGHLIGHT, PRESSED).
- */
-enum StatusIndicators
-{
-	ALPHA;
-	// BRIGHTNESS (Sizin isteğiniz üzerine dahil edilmedi)
-	NONE;
+	#if FLX_SOUND_SYSTEM
+	/**
+	 * The sound to play when this event fires.
+	 */
+	public var sound:FlxSound;
+	#end
+
+	/**
+	 * @param   Callback   The callback function to call when this even fires.
+	 * @param   sound	  The sound to play when this event fires.
+	 */
+	public function new(?Callback:Void->Void, ?sound:FlxSound):Void
+	{
+		callback = Callback;
+
+		#if FLX_SOUND_SYSTEM
+		this.sound = sound;
+		#end
+	}
+
+	/**
+	 * Cleans up memory.
+	 */
+	public inline function destroy():Void
+	{
+		callback = null;
+
+		#if FLX_SOUND_SYSTEM
+		sound = FlxDestroyUtil.destroy(sound);
+		#end
+	}
+
+	/**
+	 * Fires this event (calls the callback and plays the sound)
+	 */
+	public inline function fire():Void
+	{
+		if (callback != null)
+			callback();
+
+		#if FLX_SOUND_SYSTEM
+		if (sound != null)
+			sound.play(true);
+		#end
+	}
 }
